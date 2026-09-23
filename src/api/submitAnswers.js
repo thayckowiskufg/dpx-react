@@ -2,9 +2,9 @@
 //
 // As respostas são enviadas para um Google Apps Script publicado como Web
 // App, que grava uma nova linha na planilha do Google Sheets. Os campos de
-// upload (exames e vídeos) guardam File objects em memória, que não são
-// serializáveis em JSON nem enviados pelo Apps Script, então aqui
-// exportamos apenas o nome de cada arquivo anexado.
+// upload (exames e vídeos) já chegam aqui como { name, url } — o arquivo em
+// si foi enviado direto ao Google Drive pelo navegador (ver api/googleDrive.js)
+// no momento em que foi selecionado, então aqui só serializamos o link.
 //
 // O fetch usa Content-Type "text/plain" (em vez de "application/json") de
 // propósito: assim o navegador não dispara um preflight OPTIONS, que o
@@ -15,8 +15,8 @@ const SHEET_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyZCxtBFqk9Vy_kh
 function serializeAnswers(answers) {
   const result = {}
   Object.entries(answers).forEach(([key, value]) => {
-    if (Array.isArray(value) && value[0] instanceof File) {
-      result[key] = value.map((file) => file.name)
+    if (Array.isArray(value) && value[0]?.url) {
+      result[key] = value.map((file) => `${file.name}: ${file.url}`)
     } else {
       result[key] = value
     }

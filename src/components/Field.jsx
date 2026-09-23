@@ -1,19 +1,128 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
+import { Country, State, City } from 'country-state-city'
+import { uploadFilesToDrive } from '../api/googleDrive'
 
 const NUMBER_PATTERN = /^[0-9]*[.,]?[0-9]*$/
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const ALL_COUNTRIES = Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name))
+
+function LocationSelect({ placeholder, options, value, onChange, disabled }) {
+  return (
+    <select
+      className="select-input"
+      value={value ?? ''}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value || undefined)}
+    >
+      <option value="">{disabled ? placeholder.disabled : placeholder.enabled}</option>
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function CountryField({ value, onChange }) {
+  const options = useMemo(() => ALL_COUNTRIES.map((country) => country.name), [])
+  return (
+    <LocationSelect
+      placeholder={{ enabled: 'Selecione o país', disabled: 'Selecione o país' }}
+      options={options}
+      value={value}
+      onChange={onChange}
+    />
+  )
+}
+
+function StateField({ value, onChange, countryName }) {
+  const country = useMemo(() => ALL_COUNTRIES.find((item) => item.name === countryName), [countryName])
+  const options = useMemo(() => {
+    if (!country) return []
+    return State.getStatesOfCountry(country.isoCode)
+      .map((state) => state.name)
+      .sort((a, b) => a.localeCompare(b))
+  }, [country])
+
+  // Alguns países não têm estados/províncias cadastrados na base: nesse caso,
+  // libera um campo de texto livre para não travar quem preenche o formulário.
+  if (country && options.length === 0) {
+    return (
+      <input
+        className="text-input"
+        type="text"
+        value={value ?? ''}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    )
+  }
+
+  return (
+    <LocationSelect
+      placeholder={{ enabled: 'Selecione o estado', disabled: 'Selecione o país primeiro' }}
+      options={options}
+      value={value}
+      onChange={onChange}
+      disabled={!country}
+    />
+  )
+}
+
+function CityField({ value, onChange, countryName, stateName }) {
+  const country = useMemo(() => ALL_COUNTRIES.find((item) => item.name === countryName), [countryName])
+  const state = useMemo(() => {
+    if (!country) return null
+    return State.getStatesOfCountry(country.isoCode).find((item) => item.name === stateName) ?? null
+  }, [country, stateName])
+
+  const options = useMemo(() => {
+    if (!country || !state) return []
+    return City.getCitiesOfState(country.isoCode, state.isoCode)
+      .map((city) => city.name)
+      .sort((a, b) => a.localeCompare(b))
+  }, [country, state])
+
+  // Sem estado selecionado, ou sem cidades cadastradas para ele, cai para texto livre.
+  if (!state || options.length === 0) {
+    return (
+      <input
+        className="text-input"
+        type="text"
+        value={value ?? ''}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={!countryName}
+        placeholder={!countryName ? 'Selecione o país e o estado primeiro' : undefined}
+      />
+    )
+  }
+
+  return (
+    <LocationSelect
+      placeholder={{ enabled: 'Selecione a cidade', disabled: 'Selecione o estado primeiro' }}
+      options={options}
+      value={value}
+      onChange={onChange}
+      disabled={!state}
+    />
+  )
+}
 
 function ChoiceButtons({ options, value, onSelect }) {
   return (
     <div className="choice-group">
       {options.map((option) => (
-        <button
+        <motion.button
           key={option}
           type="button"
           className={`choice-button${value === option ? ' selected' : ''}`}
           onClick={() => onSelect(option)}
+          whileTap={{ scale: 0.96 }}
         >
           {option}
-        </button>
+        </motion.button>
       ))}
     </div>
   )
@@ -25,22 +134,25 @@ function MultiChoiceChips({ options, value, onToggle }) {
   return (
     <div className="choice-group">
       {options.map((option) => (
-        <button
+        <motion.button
           key={option}
           type="button"
           className={`choice-button${selected.includes(option) ? ' selected' : ''}`}
           onClick={() => onToggle(option)}
+          whileTap={{ scale: 0.96 }}
         >
           {option}
-        </button>
+        </motion.button>
       ))}
     </div>
   )
 }
 
 function FileInput({ field, value, onChange }) {
+  // Cada item de "files" é { name, url } depois de enviado para o Drive.
   const files = Array.isArray(value) ? value : []
   const [localError, setLocalError] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   function handleFiles(event) {
     const picked = Array.from(event.target.files || [])
@@ -69,11 +181,18 @@ function FileInput({ field, value, onChange }) {
 
     if (accepted.length === 0) return
 
-    if (field.multiple) {
-      onChange([...files, ...accepted])
-    } else {
-      onChange(accepted.slice(0, 1))
-    }
+    // Chamada síncrona (sem "await" antes) para preservar o gesto do usuário
+    // e não deixar o navegador bloquear o popup de login do Google.
+    setUploading(true)
+    uploadFilesToDrive(accepted)
+      .then((uploaded) => {
+        setLocalError('')
+        onChange(field.multiple ? [...files, ...uploaded] : uploaded.slice(0, 1))
+      })
+      .catch((error) => {
+        setLocalError(error.message || 'Falha ao enviar o arquivo para o Google Drive. Tente novamente.')
+      })
+      .finally(() => setUploading(false))
   }
 
   function removeFile(index) {
@@ -87,6 +206,7 @@ function FileInput({ field, value, onChange }) {
         type="file"
         accept={field.acceptAttr}
         multiple={!!field.multiple}
+        disabled={uploading}
         onChange={handleFiles}
       />
       {field.acceptLabel && (
@@ -95,12 +215,15 @@ function FileInput({ field, value, onChange }) {
           {field.maxSizeMB ? ` · até ${field.maxSizeMB}MB por arquivo` : ''}
         </p>
       )}
+      {uploading && <p className="file-hint">Enviando para o Google Drive…</p>}
       {localError && <p className="field-error">{localError}</p>}
       {files.length > 0 && (
         <ul className="file-list">
           {files.map((file, index) => (
             <li key={`${file.name}-${index}`}>
-              <span>{file.name}</span>
+              <a href={file.url} target="_blank" rel="noreferrer">
+                {file.name}
+              </a>
               <button type="button" className="file-remove" onClick={() => removeFile(index)}>
                 Remover
               </button>
@@ -112,7 +235,7 @@ function FileInput({ field, value, onChange }) {
   )
 }
 
-export default function Field({ field, value, onChange, error }) {
+export default function Field({ field, value, answers, onChange, error }) {
   const { label, type } = field
 
   function renderInput() {
@@ -127,15 +250,36 @@ export default function Field({ field, value, onChange, error }) {
           />
         )
 
-      case 'email':
+      case 'email': {
+        const isValid = !!value && EMAIL_PATTERN.test(value)
         return (
-          <input
-            className="text-input"
-            type="email"
-            inputMode="email"
-            placeholder="nome@exemplo.com"
-            value={value ?? ''}
-            onChange={(event) => onChange(event.target.value)}
+          <div className="email-field">
+            <input
+              className={`text-input${isValid ? ' valid' : ''}`}
+              type="email"
+              inputMode="email"
+              placeholder="nome@exemplo.com"
+              value={value ?? ''}
+              onChange={(event) => onChange(event.target.value)}
+            />
+            {isValid && <span className="email-valid-icon">✓</span>}
+          </div>
+        )
+      }
+
+      case 'country':
+        return <CountryField value={value} onChange={onChange} />
+
+      case 'state':
+        return <StateField value={value} onChange={onChange} countryName={answers?.[field.dependsOn]} />
+
+      case 'city':
+        return (
+          <CityField
+            value={value}
+            onChange={onChange}
+            countryName={answers?.pais}
+            stateName={answers?.[field.dependsOn]}
           />
         )
 

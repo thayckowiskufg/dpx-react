@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import ProgressBar from './components/ProgressBar'
 import Field from './components/Field'
 import { sections } from './data/schema'
@@ -43,6 +44,16 @@ export default function App() {
   const [answers, setAnswers] = useState({})
   const [errors, setErrors] = useState({})
   const [done, setDone] = useState(false)
+  const [theme, setTheme] = useState(() => localStorage.getItem('dpx-theme') || 'light')
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('dpx-theme', theme)
+  }, [theme])
+
+  function toggleTheme() {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+  }
 
   const step = STEPS[stepIndex]
 
@@ -57,6 +68,14 @@ export default function App() {
       // Limpa campos condicionais órfãos quando a condição deixa de ser satisfeita.
       ALL_FIELDS.forEach((field) => {
         if (field.condition?.field === fieldId && !isVisible(field, next)) {
+          delete next[field.id]
+        }
+      })
+      // Limpa campos em cascata (ex.: estado, cidade) quando o campo do qual dependem muda,
+      // propagando em cadeia (mudar o país limpa o estado, que por sua vez limpa a cidade).
+      // ALL_FIELDS segue a ordem do schema, então um passe único já resolve a cadeia.
+      ALL_FIELDS.forEach((field) => {
+        if (field.dependsOn && next[field.dependsOn] === undefined && next[field.id] !== undefined) {
           delete next[field.id]
         }
       })
@@ -96,36 +115,69 @@ export default function App() {
   if (done) {
     return (
       <div className="app-shell">
-        <div className="card">
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        <motion.div
+          className="card"
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+        >
           <h1>Respostas registradas</h1>
           <p>Suas respostas foram enviadas com sucesso. Muito obrigado pela contribuição!</p>
-        </div>
+        </motion.div>
       </div>
     )
   }
 
+  const stepKey = step.kind === 'section' ? step.section.id : 'review'
+
   return (
     <div className="app-shell">
+      <ThemeToggle theme={theme} onToggle={toggleTheme} />
       <div className="card">
         <ProgressBar current={stepIndex + 1} total={STEPS.length} />
 
-        {step.kind === 'section' && (
-          <Screen
-            section={step.section}
-            fields={visibleFields}
-            answers={answers}
-            errors={errors}
-            onChange={updateAnswer}
-            onNext={goNext}
-            onBack={stepIndex > 0 ? goBack : null}
-          />
-        )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={stepKey}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -24 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+          >
+            {step.kind === 'section' && (
+              <Screen
+                section={step.section}
+                fields={visibleFields}
+                answers={answers}
+                errors={errors}
+                onChange={updateAnswer}
+                onNext={goNext}
+                onBack={stepIndex > 0 ? goBack : null}
+              />
+            )}
 
-        {step.kind === 'review' && (
-          <ReviewScreen answers={answers} onBack={goBack} onEdit={goToStep} onConfirm={handleConfirm} />
-        )}
+            {step.kind === 'review' && (
+              <ReviewScreen answers={answers} onBack={goBack} onEdit={goToStep} onConfirm={handleConfirm} />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
+  )
+}
+
+function ThemeToggle({ theme, onToggle }) {
+  return (
+    <motion.button
+      type="button"
+      className="theme-toggle"
+      onClick={onToggle}
+      whileTap={{ scale: 0.9 }}
+      aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
+    >
+      {theme === 'dark' ? '☀️' : '🌙'}
+    </motion.button>
   )
 }
 
@@ -142,15 +194,15 @@ function NavButtons({ onBack, onNext, nextLabel = 'Próximo' }) {
   return (
     <div className="nav-buttons">
       {onBack ? (
-        <button type="button" className="nav-button secondary" onClick={onBack}>
+        <motion.button type="button" className="nav-button secondary" onClick={onBack} whileTap={{ scale: 0.97 }}>
           Anterior
-        </button>
+        </motion.button>
       ) : (
         <span />
       )}
-      <button type="button" className="nav-button primary" onClick={onNext}>
+      <motion.button type="button" className="nav-button primary" onClick={onNext} whileTap={{ scale: 0.97 }}>
         {nextLabel}
-      </button>
+      </motion.button>
     </div>
   )
 }
@@ -160,7 +212,14 @@ function Screen({ section, fields, answers, errors, onChange, onNext, onBack }) 
     <div>
       <ScreenHeader title={section.title} />
       {fields.map((field) => (
-        <Field key={field.id} field={field} value={answers[field.id]} error={errors[field.id]} onChange={(value) => onChange(field.id, value)} />
+        <Field
+          key={field.id}
+          field={field}
+          value={answers[field.id]}
+          answers={answers}
+          error={errors[field.id]}
+          onChange={(value) => onChange(field.id, value)}
+        />
       ))}
       <NavButtons onBack={onBack} onNext={onNext} />
     </div>

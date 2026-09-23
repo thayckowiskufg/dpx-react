@@ -16,11 +16,18 @@
 //   radio       -> escolha única, poucas opções, exibidas como botões
 //   multiselect -> múltipla escolha, exibida como chips clicáveis
 //   file        -> upload de arquivo(s), guardados como File[] em memória
+//   country     -> select de país (base de dados da lib country-state-city)
+//   state       -> select de estado, filtrado pelo país escolhido em "dependsOn"
+//   city        -> select de cidade, filtrado pelo estado escolhido em "dependsOn"
 //
 // Um campo pode ter "condition": { field, equals } ou { field, in: [...] }
 // indicando que só deve aparecer (e ser exigido) quando outro campo já
 // respondido tiver aquele valor. Quando a condição deixa de ser satisfeita,
 // o valor do campo é limpo automaticamente para evitar dado órfão.
+//
+// Um campo pode ter "dependsOn": "outro_campo_id" indicando que suas opções
+// dependem do valor de outro campo (ex.: estado depende do país escolhido).
+// Quando o campo do qual se depende muda, o valor é limpo em cadeia.
 
 export const SIM_NAO = ['Sim', 'Não']
 
@@ -32,7 +39,9 @@ export const sections = [
       { id: 'veterinario_responsavel', label: 'Médico veterinário responsável', type: 'text', required: true },
       { id: 'tutor_responsavel', label: 'Responsável pelo pet / tutor', type: 'text', required: true },
       { id: 'email', label: 'E-mail', type: 'email', required: true },
-      { id: 'cidade_estado_pais', label: 'Cidade / Estado / País', type: 'text', required: true },
+      { id: 'pais', label: 'País', type: 'country', required: true },
+      { id: 'estado', label: 'Estado', type: 'state', dependsOn: 'pais', required: true },
+      { id: 'cidade', label: 'Cidade', type: 'city', dependsOn: 'estado', required: true },
       { id: 'nome_paciente', label: 'Nome do paciente', type: 'text', required: true },
       { id: 'raca_paciente', label: 'Raça do paciente', type: 'text', required: true },
       {
