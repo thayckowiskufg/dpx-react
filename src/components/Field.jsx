@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Country, State, City } from 'country-state-city'
-import { uploadFilesToDrive } from '../api/googleDrive'
+import { uploadFilesToDrive, connectGoogleDrive, isDriveConnected } from '../api/googleDrive'
 
-const NUMBER_PATTERN = /^[0-9]*[.,]?[0-9]*$/
+// Até 2 dígitos inteiros e 1 casa decimal (ex.: "12" ou "12,5") — suficiente
+// para idade de animal em anos, e evita entradas absurdas tipo "12.34.56".
+const NUMBER_PATTERN = /^[0-9]{0,2}([.,][0-9]{0,1})?$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const ALL_COUNTRIES = Country.getAllCountries().sort((a, b) => a.name.localeCompare(b.name))
@@ -153,6 +155,19 @@ function FileInput({ field, value, onChange }) {
   const files = Array.isArray(value) ? value : []
   const [localError, setLocalError] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [connected, setConnected] = useState(isDriveConnected())
+  const [connecting, setConnecting] = useState(false)
+
+  function handleConnect() {
+    setConnecting(true)
+    setLocalError('')
+    connectGoogleDrive()
+      .then(() => setConnected(true))
+      .catch((error) => {
+        setLocalError(error.message || 'Não foi possível conectar ao Google Drive. Tente novamente.')
+      })
+      .finally(() => setConnecting(false))
+  }
 
   function handleFiles(event) {
     const picked = Array.from(event.target.files || [])
@@ -201,14 +216,26 @@ function FileInput({ field, value, onChange }) {
 
   return (
     <div className="file-field">
-      <input
-        className="file-input"
-        type="file"
-        accept={field.acceptAttr}
-        multiple={!!field.multiple}
-        disabled={uploading}
-        onChange={handleFiles}
-      />
+      {!connected ? (
+        <motion.button
+          type="button"
+          className="nav-button primary drive-connect-button"
+          onClick={handleConnect}
+          disabled={connecting}
+          whileTap={{ scale: 0.97 }}
+        >
+          {connecting ? 'Conectando…' : 'Conectar ao Google Drive'}
+        </motion.button>
+      ) : (
+        <input
+          className="file-input"
+          type="file"
+          accept={field.acceptAttr}
+          multiple={!!field.multiple}
+          disabled={uploading}
+          onChange={handleFiles}
+        />
+      )}
       {field.acceptLabel && (
         <p className="file-hint">
           Formatos aceitos: {field.acceptLabel}
@@ -285,16 +312,20 @@ export default function Field({ field, value, answers, onChange, error }) {
 
       case 'number':
         return (
-          <input
-            className="text-input"
-            type="text"
-            inputMode="decimal"
-            value={value ?? ''}
-            onChange={(event) => {
-              const next = event.target.value
-              if (NUMBER_PATTERN.test(next)) onChange(next)
-            }}
-          />
+          <div className={`number-field${field.unit ? ' with-unit' : ''}`}>
+            <input
+              className="text-input"
+              type="text"
+              inputMode="decimal"
+              maxLength={5}
+              value={value ?? ''}
+              onChange={(event) => {
+                const next = event.target.value
+                if (NUMBER_PATTERN.test(next)) onChange(next)
+              }}
+            />
+            {field.unit && <span className="number-unit">{field.unit}</span>}
+          </div>
         )
 
       case 'date':
@@ -321,18 +352,25 @@ export default function Field({ field, value, answers, onChange, error }) {
         return <ChoiceButtons options={field.options} value={value} onSelect={onChange} />
 
       case 'multiselect': {
+        // Apesar do nome (mantido por compatibilidade com o schema e a
+        // planilha), só é permitido selecionar uma alternativa por vez.
+        // Com mais de 5 opções, um dropdown é mais fácil de navegar do que
+        // uma grade de chips — mesma lógica usada no campo de cidade.
         const selected = Array.isArray(value) ? value : []
+
+        if (field.options.length > 5) {
+          return (
+            <LocationSelect
+              placeholder={{ enabled: 'Selecione uma opção', disabled: 'Selecione uma opção' }}
+              options={field.options}
+              value={selected[0]}
+              onChange={(option) => onChange(option ? [option] : [])}
+            />
+          )
+        }
+
         function toggle(option) {
-          if (option === 'Nenhum' || option === 'Não avaliadas') {
-            onChange(selected.includes(option) ? [] : [option])
-            return
-          }
-          const withoutExclusive = selected.filter((item) => item !== 'Nenhum' && item !== 'Não avaliadas')
-          if (withoutExclusive.includes(option)) {
-            onChange(withoutExclusive.filter((item) => item !== option))
-          } else {
-            onChange([...withoutExclusive, option])
-          }
+          onChange(selected.includes(option) ? [] : [option])
         }
         return <MultiChoiceChips options={field.options} value={selected} onToggle={toggle} />
       }

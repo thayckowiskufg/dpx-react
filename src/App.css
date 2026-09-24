@@ -36,6 +36,22 @@
   overflow: hidden;
 }
 
+.app-title {
+  margin-bottom: 20px;
+}
+
+.app-title h1 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+  color: var(--color-primary-dark);
+}
+
+.app-subtitle {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
 .progress-wrap {
   margin-bottom: 24px;
 }
@@ -118,6 +134,24 @@
 
 .textarea {
   resize: vertical;
+}
+
+.number-field.with-unit {
+  position: relative;
+}
+
+.number-field.with-unit .text-input {
+  padding-right: 52px;
+}
+
+.number-unit {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  pointer-events: none;
 }
 
 .select-input {
@@ -282,6 +316,13 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.drive-connect-button {
+  flex: none;
+  width: fit-content;
+  padding: 12px 20px;
+  min-height: 44px;
 }
 
 .file-input {

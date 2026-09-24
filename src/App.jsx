@@ -26,6 +26,16 @@ function hasValue(value) {
   return true
 }
 
+function fieldLabel(fieldId) {
+  return ALL_FIELDS.find((field) => field.id === fieldId)?.label ?? fieldId
+}
+
+function parseNumber(value) {
+  if (!hasValue(value)) return null
+  const parsed = Number(String(value).replace(',', '.'))
+  return Number.isNaN(parsed) ? null : parsed
+}
+
 function fieldError(field, answers) {
   if (!isVisible(field, answers)) return null
   const value = answers[field.id]
@@ -34,6 +44,30 @@ function fieldError(field, answers) {
 
   if (field.type === 'email' && hasValue(value) && !EMAIL_PATTERN.test(value)) {
     return 'Informe um e-mail em um formato válido.'
+  }
+
+  if (field.type === 'number' && hasValue(value)) {
+    const parsed = parseNumber(value)
+    if (parsed === null) return 'Informe um número válido.'
+
+    if (field.min !== undefined && parsed < field.min) {
+      return `O valor não pode ser menor que ${field.min}.`
+    }
+    if (field.max !== undefined && parsed > field.max) {
+      return `O valor não pode ser maior que ${field.max}.`
+    }
+    if (field.minField) {
+      const minValue = parseNumber(answers[field.minField])
+      if (minValue !== null && parsed < minValue) {
+        return `Não pode ser menor que "${fieldLabel(field.minField)}".`
+      }
+    }
+    if (field.maxField) {
+      const maxValue = parseNumber(answers[field.maxField])
+      if (maxValue !== null && parsed > maxValue) {
+        return `Não pode ser maior que "${fieldLabel(field.maxField)}".`
+      }
+    }
   }
 
   return null
@@ -135,6 +169,10 @@ export default function App() {
     <div className="app-shell">
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
       <div className="card">
+        <div className="app-title">
+          <h1>Questionário DPx</h1>
+          <p className="app-subtitle">Discinesia Paroxística Canina — levantamento clínico</p>
+        </div>
         <ProgressBar current={stepIndex + 1} total={STEPS.length} />
 
         <AnimatePresence mode="wait">

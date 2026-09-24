@@ -27,10 +27,30 @@ function loadTokenClient() {
 // Precisa ser chamada a partir de um gesto direto do usuário (ex.: dentro do
 // onChange de um <input type="file">, sem "await" antes dela), senão o
 // navegador bloqueia o popup de login do Google.
+//
+// Quando o popup é bloqueado, o Google Identity Services só registra um aviso
+// no console (sem chamar nosso callback de erro nem de sucesso), então sem um
+// tempo limite o app travaria pra sempre em "Enviando...". O timeout abaixo
+// transforma esse silêncio numa mensagem de erro visível para quem preenche.
 function requestAccessToken() {
   return new Promise((resolve, reject) => {
     const client = loadTokenClient()
+    let settled = false
+
+    const timeoutId = setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(
+        new Error(
+          'O Google não abriu a tela de login. Verifique se o navegador está bloqueando pop-ups para este site, permita e tente novamente.',
+        ),
+      )
+    }, 120000)
+
     client.callback = (response) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeoutId)
       if (response.error) {
         reject(new Error(response.error))
         return
@@ -45,6 +65,20 @@ function requestAccessToken() {
 async function getAccessToken() {
   if (cachedToken) return cachedToken
   return requestAccessToken()
+}
+
+// true se já autorizamos o Google Drive nesta sessão (token em cache).
+export function isDriveConnected() {
+  return !!cachedToken
+}
+
+// Precisa ser chamada a partir de um clique "solto" (um botão dedicado, por
+// exemplo), nunca de dentro do onChange de um <input type="file">: o Chrome
+// bloqueia window.open quando ele é disparado muito perto da caixa de diálogo
+// nativa de escolha de arquivo ("window.open blocked due to active file
+// chooser"), mesmo sendo um gesto legítimo do usuário.
+export async function connectGoogleDrive() {
+  return getAccessToken()
 }
 
 async function uploadOne(file, accessToken) {
@@ -73,7 +107,9 @@ async function uploadOne(file, accessToken) {
   }
 
   if (!response.ok) {
-    throw new Error(`Falha ao enviar "${file.name}" para o Drive (status ${response.status}).`)
+    const body = await response.json().catch(() => null)
+    const reason = body?.error?.message || 'motivo desconhecido'
+    throw new Error(`Falha ao enviar "${file.name}" para o Drive (status ${response.status}): ${reason}`)
   }
 
   const data = await response.json()

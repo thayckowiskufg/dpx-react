@@ -14,8 +14,9 @@
 //   number      -> numérico, aceita só dígitos e vírgula/ponto decimal
 //   date        -> data (input nativo type="date", valor ISO AAAA-MM-DD)
 //   radio       -> escolha única, poucas opções, exibidas como botões
-//   multiselect -> múltipla escolha, exibida como chips clicáveis
-//   file        -> upload de arquivo(s), guardados como File[] em memória
+//   multiselect -> escolha única, várias opções, exibida como chips clicáveis
+//                  (apesar do nome, só permite selecionar 1 alternativa por vez)
+//   file        -> upload de arquivo(s), enviados direto ao Google Drive
 //   country     -> select de país (base de dados da lib country-state-city)
 //   state       -> select de estado, filtrado pelo país escolhido em "dependsOn"
 //   city        -> select de cidade, filtrado pelo estado escolhido em "dependsOn"
@@ -28,6 +29,11 @@
 // Um campo pode ter "dependsOn": "outro_campo_id" indicando que suas opções
 // dependem do valor de outro campo (ex.: estado depende do país escolhido).
 // Quando o campo do qual se depende muda, o valor é limpo em cadeia.
+//
+// Um campo "number" pode ter "unit" (texto exibido ao lado do input, ex.:
+// "anos"), "min"/"max" (limites fixos) e "minField"/"maxField" (limites
+// dinâmicos, comparando com o valor de outro campo — ex.: a idade no primeiro
+// episódio não pode ser maior que a idade atual do paciente).
 
 export const SIM_NAO = ['Sim', 'Não']
 
@@ -54,18 +60,29 @@ export const sections = [
       {
         id: 'idade_castracao',
         label: 'Idade em que foi castrado',
-        type: 'text',
+        type: 'number',
+        unit: 'anos',
+        min: 0,
+        maxField: 'idade_atual',
         condition: { field: 'sexo', in: ['Macho castrado', 'Fêmea castrada'] },
         required: true,
       },
-      { id: 'idade_atual', label: 'Idade atual do paciente', type: 'number', required: true },
+      { id: 'idade_atual', label: 'Idade atual do paciente', type: 'number', unit: 'anos', min: 0, max: 30, required: true },
     ],
   },
   {
     id: 'dpx',
     title: 'Dados sobre DPX',
     fields: [
-      { id: 'idade_primeiro_episodio', label: 'Idade no primeiro episódio', type: 'number', required: true },
+      {
+        id: 'idade_primeiro_episodio',
+        label: 'Idade no primeiro episódio',
+        type: 'number',
+        unit: 'anos',
+        min: 0,
+        maxField: 'idade_atual',
+        required: true,
+      },
       {
         id: 'duracao_media',
         label: 'Duração média dos episódios',
