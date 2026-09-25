@@ -294,6 +294,16 @@ export default function Field({ field, value, answers, onChange, error }) {
         )
       }
 
+      case 'select':
+        return (
+          <LocationSelect
+            placeholder={{ enabled: 'Selecione uma opção', disabled: 'Selecione uma opção' }}
+            options={field.options}
+            value={value}
+            onChange={onChange}
+          />
+        )
+
       case 'country':
         return <CountryField value={value} onChange={onChange} />
 

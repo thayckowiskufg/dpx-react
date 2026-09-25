@@ -1,3 +1,5 @@
+import { DOG_BREEDS } from './breeds'
+
 // Schema do Questionário DPX (Discinesia Paroxística Canina).
 //
 // Estrutura oficial definida pelo professor, em 4 seções:
@@ -20,6 +22,7 @@
 //   country     -> select de país (base de dados da lib country-state-city)
 //   state       -> select de estado, filtrado pelo país escolhido em "dependsOn"
 //   city        -> select de cidade, filtrado pelo estado escolhido em "dependsOn"
+//   select      -> select simples com lista de opções fixa (ex.: raça do animal)
 //
 // Um campo pode ter "condition": { field, equals } ou { field, in: [...] }
 // indicando que só deve aparecer (e ser exigido) quando outro campo já
@@ -49,7 +52,7 @@ export const sections = [
       { id: 'estado', label: 'Estado', type: 'state', dependsOn: 'pais', required: true },
       { id: 'cidade', label: 'Cidade', type: 'city', dependsOn: 'estado', required: true },
       { id: 'nome_paciente', label: 'Nome do paciente', type: 'text', required: true },
-      { id: 'raca_paciente', label: 'Raça do paciente', type: 'text', required: true },
+      { id: 'raca_paciente', label: 'Raça do paciente', type: 'select', options: DOG_BREEDS, required: true },
       {
         id: 'sexo',
         label: 'Sexo',
