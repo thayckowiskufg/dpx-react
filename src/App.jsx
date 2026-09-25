@@ -79,14 +79,28 @@ export default function App() {
   const [errors, setErrors] = useState({})
   const [done, setDone] = useState(false)
   const [theme, setTheme] = useState(() => localStorage.getItem('dpx-theme') || 'light')
+  const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem('dpx-font-scale')) || 1)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('dpx-theme', theme)
   }, [theme])
 
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${fontScale * 100}%`
+    localStorage.setItem('dpx-font-scale', String(fontScale))
+  }, [fontScale])
+
   function toggleTheme() {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+  }
+
+  function cycleFontScale() {
+    setFontScale((current) => {
+      const steps = [1, 1.15, 1.3]
+      const nextIndex = (steps.indexOf(current) + 1) % steps.length
+      return steps[nextIndex]
+    })
   }
 
   const step = STEPS[stepIndex]
@@ -149,7 +163,10 @@ export default function App() {
   if (done) {
     return (
       <div className="app-shell">
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        <div className="a11y-controls">
+          <FontSizeToggle scale={fontScale} onCycle={cycleFontScale} />
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
         <motion.div
           className="card"
           initial={{ opacity: 0, scale: 0.96 }}
@@ -167,7 +184,10 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      <div className="a11y-controls">
+        <FontSizeToggle scale={fontScale} onCycle={cycleFontScale} />
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      </div>
       <div className="card">
         <div className="app-title">
           <h1>Questionário DPx</h1>
@@ -202,6 +222,21 @@ export default function App() {
         </AnimatePresence>
       </div>
     </div>
+  )
+}
+
+function FontSizeToggle({ scale, onCycle }) {
+  const label = scale === 1 ? 'A' : scale === 1.15 ? 'A+' : 'A++'
+  return (
+    <motion.button
+      type="button"
+      className="font-size-toggle"
+      onClick={onCycle}
+      whileTap={{ scale: 0.9 }}
+      aria-label="Aumentar tamanho da fonte"
+    >
+      {label}
+    </motion.button>
   )
 }
 
