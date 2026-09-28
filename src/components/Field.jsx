@@ -28,14 +28,17 @@ function LocationSelect({ placeholder, options, value, onChange, disabled }) {
   )
 }
 
-const WHEEL_ITEM_HEIGHT = 40
-const WHEEL_VISIBLE_HEIGHT = 160
+const WHEEL_ITEM_HEIGHT = 36
+const WHEEL_VISIBLE_ROWS = 7
+const WHEEL_VISIBLE_HEIGHT = WHEEL_ITEM_HEIGHT * WHEEL_VISIBLE_ROWS
 const WHEEL_PADDING = (WHEEL_VISIBLE_HEIGHT - WHEEL_ITEM_HEIGHT) / 2
 
 function WheelColumn({ values, selected, onSelect }) {
   const scrollRef = useRef(null)
   const timeoutRef = useRef(null)
+  const rafRef = useRef(null)
   const isFirstRender = useRef(true)
+  const [liveIndex, setLiveIndex] = useState(() => Math.max(0, values.indexOf(selected)))
 
   useEffect(() => {
     if (!isFirstRender.current) return
@@ -49,30 +52,41 @@ function WheelColumn({ values, selected, onSelect }) {
 
   function handleScroll(event) {
     const scrollTop = event.target.scrollTop
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(() => setLiveIndex(scrollTop / WHEEL_ITEM_HEIGHT))
+
     clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => {
       const index = Math.max(0, Math.min(Math.round(scrollTop / WHEEL_ITEM_HEIGHT), values.length - 1))
       onSelect(values[index])
       const el = scrollRef.current
       if (el) el.scrollTop = index * WHEEL_ITEM_HEIGHT
+      setLiveIndex(index)
     }, 130)
   }
 
   return (
-    <div className="wheel-column">
-      <div className="wheel-highlight" />
-      <div
-        ref={scrollRef}
-        className="wheel-scroll"
-        onScroll={handleScroll}
-        style={{ paddingTop: WHEEL_PADDING, paddingBottom: WHEEL_PADDING, height: WHEEL_VISIBLE_HEIGHT }}
-      >
-        {values.map((v) => (
-          <div key={v} className={`wheel-item${v === selected ? ' selected' : ''}`} style={{ height: WHEEL_ITEM_HEIGHT }}>
+    <div
+      ref={scrollRef}
+      className="wheel-scroll"
+      onScroll={handleScroll}
+      style={{ paddingTop: WHEEL_PADDING, paddingBottom: WHEEL_PADDING, height: WHEEL_VISIBLE_HEIGHT }}
+    >
+      {values.map((v, index) => {
+        const distance = Math.abs(index - liveIndex)
+        const opacity = Math.max(0.18, 1 - distance * 0.3)
+        const scale = Math.max(0.7, 1 - distance * 0.13)
+        return (
+          <div
+            key={v}
+            className="wheel-item"
+            style={{ height: WHEEL_ITEM_HEIGHT, opacity, transform: `scale(${scale})` }}
+          >
             {v}
           </div>
-        ))}
-      </div>
+        )
+      })}
     </div>
   )
 }
@@ -94,10 +108,19 @@ function AgeField({ field, value, onChange }) {
   return (
     <div className="age-field">
       <div className="age-wheel-group">
-        <WheelColumn values={years} selected={anos} onSelect={(next) => onChange({ anos: next, meses })} />
-        <span className="age-wheel-label">anos</span>
-        <WheelColumn values={MONTH_OPTIONS} selected={meses} onSelect={(next) => onChange({ anos, meses: next })} />
-        <span className="age-wheel-label">meses</span>
+        <div className="wheel-highlight-pill" style={{ height: WHEEL_ITEM_HEIGHT }} />
+        <div className="wheel-column">
+          <WheelColumn values={years} selected={anos} onSelect={(next) => onChange({ anos: next, meses })} />
+        </div>
+        <span className="age-wheel-label" style={{ height: WHEEL_ITEM_HEIGHT, lineHeight: `${WHEEL_ITEM_HEIGHT}px` }}>
+          anos
+        </span>
+        <div className="wheel-column">
+          <WheelColumn values={MONTH_OPTIONS} selected={meses} onSelect={(next) => onChange({ anos, meses: next })} />
+        </div>
+        <span className="age-wheel-label" style={{ height: WHEEL_ITEM_HEIGHT, lineHeight: `${WHEEL_ITEM_HEIGHT}px` }}>
+          meses
+        </span>
       </div>
     </div>
   )
