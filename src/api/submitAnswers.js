@@ -12,11 +12,26 @@
 // faz JSON.parse normalmente.
 const SHEET_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyZCxtBFqk9Vy_kheU70Ubx5AFoWJTdJnF0gy3xifteOXUBPVqEzb482nWpzcsqwqr8NA/exec'
 
+function formatAge(value) {
+  const anos = value.anos ?? 0
+  const meses = value.meses ?? 0
+  const parts = []
+  if (anos > 0) parts.push(`${anos} ano${anos === 1 ? '' : 's'}`)
+  if (meses > 0 || anos === 0) parts.push(`${meses} ${meses === 1 ? 'mês' : 'meses'}`)
+  return parts.join(' e ')
+}
+
+function isAgeValue(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) && 'anos' in value && 'meses' in value
+}
+
 function serializeAnswers(answers) {
   const result = {}
   Object.entries(answers).forEach(([key, value]) => {
     if (Array.isArray(value) && value[0]?.url) {
       result[key] = value.map((file) => `${file.name}: ${file.url}`)
+    } else if (isAgeValue(value)) {
+      result[key] = formatAge(value)
     } else {
       result[key] = value
     }

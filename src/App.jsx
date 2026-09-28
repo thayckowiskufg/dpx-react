@@ -36,6 +36,23 @@ function parseNumber(value) {
   return Number.isNaN(parsed) ? null : parsed
 }
 
+function toTotalMonths(value) {
+  if (!value || typeof value !== 'object') return null
+  const anos = Number(value.anos) || 0
+  const meses = Number(value.meses) || 0
+  return anos * 12 + meses
+}
+
+function formatAge(value) {
+  if (!value || typeof value !== 'object') return ''
+  const anos = value.anos ?? 0
+  const meses = value.meses ?? 0
+  const parts = []
+  if (anos > 0) parts.push(`${anos} ano${anos === 1 ? '' : 's'}`)
+  if (meses > 0 || anos === 0) parts.push(`${meses} ${meses === 1 ? 'mês' : 'meses'}`)
+  return parts.join(' e ')
+}
+
 function fieldError(field, answers) {
   if (!isVisible(field, answers)) return null
   const value = answers[field.id]
@@ -65,6 +82,19 @@ function fieldError(field, answers) {
     if (field.maxField) {
       const maxValue = parseNumber(answers[field.maxField])
       if (maxValue !== null && parsed > maxValue) {
+        return `Não pode ser maior que "${fieldLabel(field.maxField)}".`
+      }
+    }
+  }
+
+  if (field.type === 'age' && hasValue(value)) {
+    const totalMonths = toTotalMonths(value)
+    if (field.maxYears !== undefined && totalMonths > field.maxYears * 12) {
+      return `O valor não pode ser maior que ${field.maxYears} anos.`
+    }
+    if (field.maxField) {
+      const maxMonths = toTotalMonths(answers[field.maxField])
+      if (maxMonths !== null && totalMonths > maxMonths) {
         return `Não pode ser maior que "${fieldLabel(field.maxField)}".`
       }
     }
@@ -318,6 +348,7 @@ function formatAnswer(field, value) {
     const files = Array.isArray(value) ? value : []
     return files.map((file) => file.name).join(', ')
   }
+  if (field.type === 'age') return formatAge(value)
   if (Array.isArray(value)) return value.join(', ')
   return String(value)
 }

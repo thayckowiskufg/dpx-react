@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Country, State, City } from 'country-state-city'
 import { uploadFilesToDrive, connectGoogleDrive, isDriveConnected } from '../api/googleDrive'
@@ -25,6 +25,81 @@ function LocationSelect({ placeholder, options, value, onChange, disabled }) {
         </option>
       ))}
     </select>
+  )
+}
+
+const WHEEL_ITEM_HEIGHT = 40
+const WHEEL_VISIBLE_HEIGHT = 160
+const WHEEL_PADDING = (WHEEL_VISIBLE_HEIGHT - WHEEL_ITEM_HEIGHT) / 2
+
+function WheelColumn({ values, selected, onSelect }) {
+  const scrollRef = useRef(null)
+  const timeoutRef = useRef(null)
+  const isFirstRender = useRef(true)
+
+  useEffect(() => {
+    if (!isFirstRender.current) return
+    isFirstRender.current = false
+    const el = scrollRef.current
+    if (!el) return
+    const index = Math.max(0, values.indexOf(selected))
+    el.scrollTop = index * WHEEL_ITEM_HEIGHT
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function handleScroll(event) {
+    const scrollTop = event.target.scrollTop
+    clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(() => {
+      const index = Math.max(0, Math.min(Math.round(scrollTop / WHEEL_ITEM_HEIGHT), values.length - 1))
+      onSelect(values[index])
+      const el = scrollRef.current
+      if (el) el.scrollTop = index * WHEEL_ITEM_HEIGHT
+    }, 130)
+  }
+
+  return (
+    <div className="wheel-column">
+      <div className="wheel-highlight" />
+      <div
+        ref={scrollRef}
+        className="wheel-scroll"
+        onScroll={handleScroll}
+        style={{ paddingTop: WHEEL_PADDING, paddingBottom: WHEEL_PADDING, height: WHEEL_VISIBLE_HEIGHT }}
+      >
+        {values.map((v) => (
+          <div key={v} className={`wheel-item${v === selected ? ' selected' : ''}`} style={{ height: WHEEL_ITEM_HEIGHT }}>
+            {v}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const YEAR_OPTIONS_CACHE = {}
+function getYearOptions(maxYears) {
+  if (!YEAR_OPTIONS_CACHE[maxYears]) {
+    YEAR_OPTIONS_CACHE[maxYears] = Array.from({ length: maxYears + 1 }, (_, i) => i)
+  }
+  return YEAR_OPTIONS_CACHE[maxYears]
+}
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i)
+
+function AgeField({ field, value, onChange }) {
+  const anos = value?.anos ?? 0
+  const meses = value?.meses ?? 0
+  const years = useMemo(() => getYearOptions(field.maxYears ?? 30), [field.maxYears])
+
+  return (
+    <div className="age-field">
+      <div className="age-wheel-group">
+        <WheelColumn values={years} selected={anos} onSelect={(next) => onChange({ anos: next, meses })} />
+        <span className="age-wheel-label">anos</span>
+        <WheelColumn values={MONTH_OPTIONS} selected={meses} onSelect={(next) => onChange({ anos, meses: next })} />
+        <span className="age-wheel-label">meses</span>
+      </div>
+    </div>
   )
 }
 
@@ -293,6 +368,9 @@ export default function Field({ field, value, answers, onChange, error }) {
           </div>
         )
       }
+
+      case 'age':
+        return <AgeField field={field} value={value} onChange={onChange} />
 
       case 'select':
         return (

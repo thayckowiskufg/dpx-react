@@ -23,6 +23,8 @@ import { DOG_BREEDS } from './breeds'
 //   state       -> select de estado, filtrado pelo país escolhido em "dependsOn"
 //   city        -> select de cidade, filtrado pelo estado escolhido em "dependsOn"
 //   select      -> select simples com lista de opções fixa (ex.: raça do animal)
+//   age         -> seletor de rolagem (wheel picker) de Anos + Meses; valor
+//                  guardado como { anos, meses }
 //
 // Um campo pode ter "condition": { field, equals } ou { field, in: [...] }
 // indicando que só deve aparecer (e ser exigido) quando outro campo já
@@ -37,6 +39,10 @@ import { DOG_BREEDS } from './breeds'
 // "anos"), "min"/"max" (limites fixos) e "minField"/"maxField" (limites
 // dinâmicos, comparando com o valor de outro campo — ex.: a idade no primeiro
 // episódio não pode ser maior que a idade atual do paciente).
+//
+// Um campo "age" tem "maxYears" (limite do seletor, em anos) e pode ter
+// "maxField" (mesma ideia do "number", mas a comparação é feita em meses
+// totais: anos*12 + meses).
 
 export const SIM_NAO = ['Sim', 'Não']
 
@@ -63,14 +69,13 @@ export const sections = [
       {
         id: 'idade_castracao',
         label: 'Idade em que foi castrado',
-        type: 'number',
-        unit: 'anos',
-        min: 0,
+        type: 'age',
+        maxYears: 30,
         maxField: 'idade_atual',
         condition: { field: 'sexo', in: ['Macho castrado', 'Fêmea castrada'] },
         required: true,
       },
-      { id: 'idade_atual', label: 'Idade atual do paciente', type: 'number', unit: 'anos', min: 0, max: 30, required: true },
+      { id: 'idade_atual', label: 'Idade atual do paciente', type: 'age', maxYears: 30, required: true },
     ],
   },
   {
@@ -80,9 +85,8 @@ export const sections = [
       {
         id: 'idade_primeiro_episodio',
         label: 'Idade no primeiro episódio',
-        type: 'number',
-        unit: 'anos',
-        min: 0,
+        type: 'age',
+        maxYears: 30,
         maxField: 'idade_atual',
         required: true,
       },
