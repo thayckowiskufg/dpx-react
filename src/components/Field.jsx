@@ -100,10 +100,27 @@ function getYearOptions(maxYears) {
 }
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i)
 
+function formatAgeSummary(anos, meses) {
+  const parts = []
+  if (anos > 0) parts.push(`${anos} ano${anos === 1 ? '' : 's'}`)
+  if (meses > 0 || anos === 0) parts.push(`${meses} ${meses === 1 ? 'mês' : 'meses'}`)
+  return parts.join(' e ')
+}
+
 function AgeField({ field, value, onChange }) {
+  const [expanded, setExpanded] = useState(false)
   const anos = value?.anos ?? 0
   const meses = value?.meses ?? 0
   const years = useMemo(() => getYearOptions(field.maxYears ?? 30), [field.maxYears])
+
+  if (!expanded) {
+    return (
+      <button type="button" className="age-summary" onClick={() => setExpanded(true)}>
+        <span>{formatAgeSummary(anos, meses)}</span>
+        <span className="age-summary-edit">Alterar</span>
+      </button>
+    )
+  }
 
   return (
     <div className="age-field">
@@ -122,6 +139,9 @@ function AgeField({ field, value, onChange }) {
           meses
         </span>
       </div>
+      <button type="button" className="age-done-button" onClick={() => setExpanded(false)}>
+        Concluído
+      </button>
     </div>
   )
 }
